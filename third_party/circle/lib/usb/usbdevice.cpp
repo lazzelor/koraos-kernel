@@ -276,12 +276,14 @@ boolean CUSBDevice::Initialize (void)
 	}
 #endif
 
-	if (m_pHost->GetDescriptor (m_pEndpoint0,
+	int nDiagGot = m_pHost->GetDescriptor (m_pEndpoint0,
 				    DESCRIPTOR_CONFIGURATION, ucConfigIndex,
-				    m_pConfigDesc, sizeof *m_pConfigDesc)
+				    m_pConfigDesc, sizeof *m_pConfigDesc);
+	if (nDiagGot
 	    != (int) sizeof *m_pConfigDesc)
 	{
-		LogWrite (LogError, "Cannot get configuration descriptor (short)");
+		LogWrite (LogError, "Cannot get configuration descriptor (short): got %d of %u, speed %u, addr %u",
+			  nDiagGot, (unsigned) sizeof *m_pConfigDesc, (unsigned) m_Speed, (unsigned) GetAddress ());
 
 		delete m_pConfigDesc;
 		m_pConfigDesc = 0;
