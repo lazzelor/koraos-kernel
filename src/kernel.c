@@ -56,21 +56,6 @@ void kernel_main(void) {
   systick_init(100);
   irq_enable();
 
-  // DIAG (usb-diag-splitfail): confirm the generic timer on real hardware. If
-  // the frequency reads wrong or the measured delay is far from 100000 us, every
-  // Circle MsDelay (incl. the 50 ms SET_ADDRESS recovery) is broken.
-  {
-    extern uint64_t timer_freq_hz(void);
-    extern uint64_t timer_us(void);
-    extern void udelay(uint64_t);
-    uint64_t f = timer_freq_hz();
-    uint64_t t0 = timer_us();
-    udelay(100000);  // 100 ms
-    uint64_t measured = timer_us() - t0;
-    printf("diag: timer_freq=%lu Hz; udelay(100000) measured %lu us; tick=%lu\n",
-           f, measured, systick_count());
-  }
-
   // Bring up the vendored Circle USB stack on the KoraOS HAL bridge. Enumeration
   // talks to real USB hardware, which QEMU's raspi3b does not emulate, so only
   // the hardware build initializes and scans for a keyboard.

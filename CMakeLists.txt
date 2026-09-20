@@ -384,6 +384,13 @@ target_compile_options(circle_usb PRIVATE
     # No C standard library underneath Circle here; this also strips CString's
     # floating-point %f path, so the kernel stays integer-only (-mgeneral-regs-only).
     -DSTDLIB_SUPPORT=0
+    # Disable Circle's Start-Of-Frame-interrupt USB timing. SOF mode drives split
+    # and periodic transfers from ~8000 IRQs/sec and needs low-latency delivery
+    # (ideally the FIQ). With KoraOS's plain-IRQ path plus a competing 100 Hz
+    # systick, microframes get skipped and split/interrupt transfers fail. The
+    # non-SOF path is channel-interrupt-driven and reads the frame counter on
+    # demand, which suits our environment.
+    -DNO_USB_SOF_INTR
     # Build only the HID keyboard device driver from Circle's USB device factory;
     # every other class (mouse, gamepads, storage, audio, net, ...) is excluded so
     # we do not have to vendor those drivers and their dependencies.
