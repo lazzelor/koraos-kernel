@@ -18,10 +18,15 @@ extern "C" void tfp_printf(const char *fmt, ...);
 
 namespace {
 
-// Cooked keystrokes from the USB keyboard. Step 3c just echoes them to the
-// console over UART; wiring them into read(fd 0) is the final milestone step.
-void key_pressed_handler(const char *pString) {
-    tfp_printf("%s", pString);
+// DIAG: log the raw 8-byte HID boot report on every interrupt-endpoint report,
+// bypassing the cooked keymap. If these lines appear on key press, reports are
+// reaching us and the issue is downstream (keymap/cooked path); if nothing
+// appears, the interrupt transfer itself is not delivering.
+void key_status_raw(unsigned char ucModifiers, const unsigned char RawKeys[6]) {
+    tfp_printf("rawkbd: mod=%02x keys=%02x %02x %02x %02x %02x %02x\n",
+               (unsigned)ucModifiers, (unsigned)RawKeys[0], (unsigned)RawKeys[1],
+               (unsigned)RawKeys[2], (unsigned)RawKeys[3], (unsigned)RawKeys[4],
+               (unsigned)RawKeys[5]);
 }
 
 }  // namespace
@@ -62,6 +67,6 @@ void circle_usb_init(int enumerate) {
         return;
     }
 
-    pKeyboard->RegisterKeyPressedHandler(key_pressed_handler);
-    tfp_printf("circle: USB keyboard ready -- type to see keys over UART\n");
+    pKeyboard->RegisterKeyStatusHandlerRaw(key_status_raw);
+    tfp_printf("circle: USB keyboard ready -- press keys to see raw reports\n");
 }
