@@ -462,7 +462,7 @@ as in use, while POKE still reaches anything; BBC's inline assembler is not
 in this phase. 4a touches the kernel and 4e needs a Pi: both stop for a
 test on hardware; 4b to 4d merge on green CI.
 
-- [ ] **4a. Kernel: faults, caches and the memory map.** A fault in a
+- [ ] **4a. Kernel: faults, caches and the memory map.** (#136) A fault in a
   program (an unmapped address, a write to code, UDF, BRK, a jump to
   nothing) ends that program with `EXIT_FAULT` (-11), reported on the
   serial line, instead of stopping the machine. `fault_handler` (syscall

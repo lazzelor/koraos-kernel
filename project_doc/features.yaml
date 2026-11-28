@@ -333,6 +333,7 @@ categories:
         name: Machine access
         status: in_progress
         description: PEEK, POKE, indirection operators, SYS and a GPIO layer, from BASIC and from Python.
+        prs: [136]
       - id: koracli-graphics
         name: Graphics and sound
         status: planned
