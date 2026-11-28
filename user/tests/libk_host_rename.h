@@ -61,6 +61,8 @@
 #define fb_claim libk_fb_claim
 #define gettid libk_gettid
 #define conlog libk_conlog
+#define fault_handler libk_fault_handler
+#define machine_info libk_machine_info
 #define wait libk_wait
 
 #endif // LIBK_HOST_RENAME_H

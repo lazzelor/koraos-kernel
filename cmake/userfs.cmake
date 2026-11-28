@@ -32,7 +32,7 @@ function(koraos_add_userfs SOURCE_ROOT IMAGE_PATH)
         add_subdirectory("${USER_DIR}/libc" "${CMAKE_BINARY_DIR}/libc")
     endif()
     set(USER_RUNTIME_SOURCES "${USER_DIR}/libk/syscall.S" "${USER_DIR}/libk/mutex.c"
-        "${USER_DIR}/libk/job.c" "${USER_DIR}/libk/heap.c")
+        "${USER_DIR}/libk/job.c" "${USER_DIR}/libk/heap.c" "${USER_DIR}/libk/code.c")
     file(GLOB_RECURSE USER_HEADERS CONFIGURE_DEPENDS "${USER_DIR}/*.h")
     # Manifest content changes on removals too, ensuring generated outputs are
     # rebuilt even when the remaining dependencies are older than those outputs.
@@ -89,6 +89,7 @@ function(koraos_add_userfs SOURCE_ROOT IMAGE_PATH)
     koraos_add_user_program(sumprobe "${SOURCE_ROOT}/tests/user/sumprobe.c")
     koraos_add_user_program(portprobe "${SOURCE_ROOT}/tests/user/portprobe.c")
     koraos_add_user_program(sigprobe "${SOURCE_ROOT}/tests/user/sigprobe.c")
+    koraos_add_user_program(faultprobe "${SOURCE_ROOT}/tests/user/faultprobe.c")
     koraos_add_user_program(inputprobe "${SOURCE_ROOT}/tests/user/inputprobe.c"
         ${LIBSCREEN_SOURCES})
     koraos_add_user_program(screenprobe "${SOURCE_ROOT}/tests/user/screenprobe.c"

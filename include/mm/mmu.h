@@ -34,6 +34,11 @@ void mmu_enable_this_core(void);
 // device-tree pointer after reading it, so page 0 is opened just for that.
 void mmu_set_firmware_page_writable(int writable);
 
+// The machine and the ranges the map holds something in, for machine_info
+// (syscall 71, sys/machine.h). Worked out on the first call.
+struct kmachine_info;
+void mmu_machine_info(struct kmachine_info *out);
+
 #ifdef __cplusplus
 }
 #endif

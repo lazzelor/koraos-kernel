@@ -669,6 +669,44 @@ the program's nor Python's is `No such FN/PROC`.
 beepbeepbeep
 ```
 
+## Machine access
+
+*Planned (phase 4, steps 4b to 4e). Works (step 4a): the kernel's part.*
+
+KoraOS has no memory protection, on purpose: as on a home computer, a
+program may read and write any memory and the hardware's registers, and run
+machine code it wrote. Phase 4 brings that to both languages:
+
+| | Python | Classic BASIC | BBC BASIC | Step |
+|---|---|---|---|---|
+| Read memory | `peek(a)`, `peek16`, `peek32`, `peek64` | `PEEK(a)` | `?a`, `!a`, `$a`, `\|a` | 4b to 4d |
+| Write memory | `poke(a, v)` and the same sizes | `POKE a, v` | `?a = v` and the rest | 4b to 4d |
+| Run machine code | `call(a, ...)` | `SYS a`, `USR(a)` | `CALL a`, `USR(a)` | 4b to 4d |
+| Reserve bytes | a `bytearray` and `kora.address(buf)` | | `DIM P% 100` | 4b, 4d |
+| GPIO pins | `pin(17, OUT)`, `pin(17, 1)`, `pin(4)` | `PIN 17 OUT`, `PIN 17 = 1`, `PIN(4)` | the same | 4e |
+
+What is decided:
+
+- **A mistake is an error, not a crash.** An address with nothing there, a
+  write to code, or machine code that goes wrong gives an error (in BASIC,
+  a BASIC error), and the program in memory is kept. Addresses outside the
+  RAM and the hardware's registers are refused before they are tried.
+  *Works (4a):* a fault ends only the program that made it, never the
+  machine, and a program can catch its faults, which the steps after build
+  on (`fault_handler`, `docs/syscalls.md`).
+- **The memory map** comes from the kernel (`machine_info`): the board, its
+  RAM and where the hardware's registers are. *Works (4a);* `kora.machine`
+  comes with 4b.
+- **Machine code** runs with its arguments in the first eight registers (x0
+  to x7) and gives back x0; BBC BASIC passes A% to H% there, as ARM BBC
+  BASIC V passes them in R0 to R7. *Works (4a), in C:* the kernel lets a
+  program sync the caches for code it wrote (libk's `code_sync`).
+- **Differences:** BBC BASIC's `|a` is an 8-byte double, as its reals are
+  (BBC BASIC V's were 5 bytes); `$a` strings end with a carriage return, as
+  on a BBC. The pins are the header's, 0 to 27; pins the system uses (14
+  and 15, the serial line) are refused as in use, though `POKE` still
+  reaches them. BBC BASIC's inline assembler is not planned for phase 4.
+
 ## Keys
 
 | Key | Where | What it does |

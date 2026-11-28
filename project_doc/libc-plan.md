@@ -149,8 +149,10 @@ Decisions:
 
 - **Signals are synchronous.** `raise` calls the handler directly; nothing
   is delivered from outside the program. The kernel's `kill` ends a program
-  with nothing to catch, and a fault at EL0 halts the machine, so `SIGSEGV`,
-  `SIGILL` and `SIGFPE` never come from hardware. A handler stays installed
+  with nothing to catch, and a fault at EL0 ends the program (KoraCLI step
+  4a; before it, it halted the machine), so `SIGSEGV`, `SIGILL` and
+  `SIGFPE` never come from hardware: a program catches faults with
+  `fault_handler` instead (`docs/syscalls.md`). A handler stays installed
   after it runs. The default action ends the program with the negative
   signal number as its exit code, the convention of the kernel's `kill`
   (-9): `abort()` gives -6.

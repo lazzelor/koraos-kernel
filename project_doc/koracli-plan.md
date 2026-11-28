@@ -98,7 +98,7 @@ From the spec's §17, with the PRs of phases 0 and 1:
 | 1b | OS commands and OS mode; the shell replaced | 1c, 1d |
 | 2 | Classic BASIC | 2a, 2b, 2c |
 | 3 | BBC BASIC | 3a to 3e (done) |
-| 4 | Machine access: PEEK/POKE, indirection, `SYS`, GPIO | later |
+| 4 | Machine access: PEEK/POKE, indirection, `SYS`, GPIO | 4a to 4e |
 | 5 | Graphics and sound on a canvas screen | later |
 | 6 | Full-screen editor, help, F-key configuration, startup file | later |
 | 7 | Job objects, `jobs`, `fg`, background output above the prompt | later |
@@ -450,13 +450,55 @@ Phase 3, BBC BASIC. Decided 2026-11-26 (spec §6.2, §6.3):
   RENUMBER and, where a volume is writable, saves in BBC BASIC and loads
   from Classic BASIC, switching.
 
-Indirection (`?`, `!`, `$`) and `SYS` in BBC BASIC come with phase 4, and
-MODE, PLOT and CLG with phase 5.
+MODE, PLOT and CLG in BBC BASIC come with phase 5.
+
+Phase 4, machine access, split on 2026-11-28. Decisions: a fault in
+PEEK, POKE or machine code is caught and becomes an error, the program in
+memory kept; peek and poke always refuse addresses outside RAM and the
+devices (no override), the fault handler covering the rest; BBC's `|` is an
+8-byte double, our reals; BBC's `$addr` strings end with CR; GPIO is the
+header's pins 0 to 27, the system's (14 and 15, the serial line) refused
+as in use, while POKE still reaches anything; BBC's inline assembler is not
+in this phase. 4a touches the kernel and 4e needs a Pi: both stop for a
+test on hardware; 4b to 4d merge on green CI.
+
+- [ ] **4a. Kernel: faults, caches and the memory map.** A fault in a
+  program (an unmapped address, a write to code, UDF, BRK, a jump to
+  nothing) ends that program with `EXIT_FAULT` (-11), reported on the
+  serial line, instead of stopping the machine. `fault_handler` (syscall
+  70) arms a thread to catch its next fault: the handler runs with the
+  kind, the address, the pc and the syndrome, in place of the faulting
+  instruction. `SCTLR_EL1.UCI` and `UCT` let a program sync the caches for
+  machine code it wrote (libk's `code_sync`). `machine_info` (syscall 71):
+  the board, its revision, its RAM and the mapped ranges (RAM, code,
+  devices). Built: the kinds from the syndrome in `src/proc/fault.c` and
+  the maps in `src/sys/machine.c`, both pure.
+  Tests: host tests for both (`fault_test.c`, `machine_test.c`);
+  `faultprobe` (smoke) catches each kind of fault, runs machine code it
+  wrote (rewritten, with arguments), checks the map against its stack and
+  heap, and has children end by uncaught faults (plain, disarmed, in the
+  handler, in a second thread), the machine going on.
+- [ ] **4b. Python: `peek`, `poke`, `call`.** In `_kora` (C) and `kora`:
+  `peek`/`poke` and their 16, 32 and 64-bit forms, refusing addresses
+  outside RAM and the devices; `call(addr, *args)` (x0 to x7, x0 back,
+  caches synced); `kora.address(buf)`; `kora.machine` (the board and the
+  map). A fault inside them is a Python exception, the interpreter going
+  on. In KoraCLI's namespace.
+- [ ] **4c. Classic BASIC.** `PEEK`, `POKE`, `SYS addr[, args]` (machine
+  code), `USR(addr[, args])` (x0 back), `WAIT addr, mask[, xor]`.
+- [ ] **4d. BBC BASIC.** The indirection operators `?`, `!`, `$` and `|`,
+  unary and binary (`?P%`, `P%!4`), read and assigned; `DIM P% n` reserves
+  bytes; `CALL addr` and `USR(addr)` with A% to H% in x0 to x7 (as ARM BBC
+  BASIC V passes them in R0 to R7); `SYS "name", args` (a Python function
+  or an OS command).
+- [ ] **4e. GPIO.** One layer in Python over `peek32`/`poke32`, the Pi 3's
+  and Pi 4's pull registers apart: `pin(17, OUT)`, `pin(17, 1)`,
+  `pin(4)`, `pin(4, IN, UP)`; in both BASICs `PIN 17 OUT`, `PIN 17 = 1`,
+  `PIN(4)`. "No GPIO" on virt. QEMU raspi3b reads an output back; an LED
+  on a Pi is the hardware test.
 
 Later phases, in a line each, to be split into PRs when they come up:
 
-- **4. Machine access.** `PEEK`, `POKE`, indirection, `SYS`, `peek`/`poke` in
-  Python, the GPIO layer for Pi 3 and Pi 4.
 - **5. Graphics and sound.** The native drawing module, the canvas screen,
   the BASIC keywords and Python functions.
 - **6. Editing and help.** The full-screen editor (needs a packet to read a

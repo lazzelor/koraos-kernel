@@ -360,12 +360,14 @@ Collisions (`A`, `A%`, `A$` and `A()` all map to Python `A`):
 - `PEEK`/`POKE` (Classic) and the `?`, `!`, `$` indirection operators (BBC) operate on real memory.
 - Python equivalents: `peek(addr)` / `poke(addr, value)` (plus word-sized variants).
 - Hex literals: `&FF` (BBC), `0xFF` (Python), `&HFF` (Classic, as in MSX/GW-BASIC).
+- *Decided (2026-11-28):* a fault in a peek, a poke or machine code is an error the program can catch, and the program in memory is kept; the kernel ends only a faulting program, never the machine, and lets a thread catch its next fault (step 4a). Addresses outside RAM and the devices are refused first, with no override. BBC's `|` is an 8-byte double and `$addr` strings end with CR. Machine code takes its arguments in x0 to x7 and returns x0 (BBC's A% to H%, as ARM BBC BASIC V's R0 to R7). No inline assembler in phase 4.
 
 ### 9.3 GPIO
-- GPIO registers are memory-mapped, so `PEEK`/`POKE` on them works directly. (Base addresses differ between Pi 3 and Pi 4; to be verified against the peripheral documentation.)
+- GPIO registers are memory-mapped, so `PEEK`/`POKE` on them works directly; the kernel's `machine_info` gives the board and the peripherals' base. (Base addresses differ between Pi 3 and Pi 4; to be verified against the peripheral documentation.)
 - Friendly layer on top, the same implementation for both languages:
   - BASIC: `PIN 17 OUT`, `PIN 17 = 1`, `x = PIN(4)`
   - Python: `pin(17, OUT)`, `pin(17, 1)`, `x = pin(4)`
+- *Decided (2026-11-28):* the header's pins 0 to 27; those the system uses (14 and 15, the serial line) are refused as in use.
 
 ---
 

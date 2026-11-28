@@ -69,6 +69,9 @@
 #define SYS_fb_claim     67
 #define SYS_gettid       68
 #define SYS_conlog       69
+// Machine access (KoraCLI phase 4): faults a program catches, the memory map.
+#define SYS_fault_handler 70
+#define SYS_machine_info 71
 
 // Dispatch a syscall described by a trap frame from EL0. The return value is
 // written back into the frame's x0.

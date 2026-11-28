@@ -13,6 +13,7 @@
 
 #include <_libc/console.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -453,6 +454,66 @@ int permit(void);
  * such running program. There are no signals: a program cannot catch it. */
 #define EXIT_KILLED (-9)
 int kill(int pid);
+
+/* Faults. A program that faults (reads or writes an address with nothing
+ * there or that it may not write, runs an undefined instruction or a BRK,
+ * jumps to a misaligned address...) ends with EXIT_FAULT, and the kernel
+ * says why on the serial line; the rest of the system goes on.
+ *
+ * A thread can catch its next fault instead: fault_handler(fn) arms it, and
+ * the fault then runs fn(kind, addr, pc, esr) on the thread's own stack in
+ * place of the instruction that faulted. `kind` is a FAULT_ value, with
+ * FAULT_WRITE added for a write; `addr` the address that faulted (for
+ * FAULT_DATA and FAULT_EXEC; 0 for the others), `pc` the instruction's,
+ * `esr` the raw syndrome (ESR_EL1). The registers it had are lost, so fn
+ * must not return (it would jump to 0): it ends the program or longjmps
+ * back. Arming is for one fault: delivering it disarms the handler, so a
+ * fault inside fn ends the program; fn arms again if it wants the next.
+ * fault_handler(NULL) disarms. Returns 0. */
+#define EXIT_FAULT (-11)
+enum {
+    FAULT_DATA = 1,   /* a load or store: nothing mapped there, or read-only */
+    FAULT_EXEC = 2,   /* an instruction fetched from where none may run */
+    FAULT_ALIGN = 3,  /* a misaligned PC, SP or access */
+    FAULT_UNDEF = 4,  /* an undefined instruction, or one EL0 may not run */
+    FAULT_BREAK = 5,  /* a BRK instruction */
+    FAULT_OTHER = 6,
+};
+#define FAULT_WRITE 0x100  /* added to FAULT_DATA (or FAULT_ALIGN) for a store */
+#define FAULT_KIND(kind) ((kind) & 0xff)
+typedef void (*fault_fn)(unsigned kind, uintptr_t addr, uintptr_t pc, uint64_t esr);
+int fault_handler(fault_fn fn);
+
+/* Machine code a program wrote into memory (any RAM it can write, which it
+ * may also run) runs only once the caches are told: code_sync() after the
+ * last write and before the first call. */
+void code_sync(const void *addr, size_t length);
+
+/* The machine and its memory map, as machine_info() reports it: the board,
+ * its revision code (the Pi's; 0 on virt), all of its RAM (some of it maybe
+ * not mapped), the base of the Pi's peripherals (BCM's "ARM physical"
+ * address; 0 on virt), and the mapped ranges, lowest first. A program reads
+ * and writes RAM, reads CODE (the kernel's and the programs' code, page 0
+ * included: writes fault), and reads and writes DEVICE (the peripherals'
+ * registers; an address there with no device may fault, or stop the
+ * machine). Everything else faults. Returns 0, or -1 for a bad pointer. */
+#define MACHINE_REGIONS_MAX 6
+enum { MEM_RAM = 1, MEM_CODE = 2, MEM_DEVICE = 3 };
+struct machine_region {
+    unsigned long base;
+    unsigned long size;
+    unsigned int kind;  /* MEM_ */
+    unsigned int reserved;
+};
+struct machine_info {
+    char board[32];              /* "Raspberry Pi 3 Model B+", "QEMU virt" */
+    unsigned int revision;
+    unsigned int region_count;
+    unsigned long ram_bytes;
+    unsigned long periph_base;
+    struct machine_region regions[MACHINE_REGIONS_MAX];
+};
+int machine_info(struct machine_info *out);
 
 /* One task (a thread of a program), as task_info() reports it (`ps`). */
 #define TASK_NAME_MAX 16

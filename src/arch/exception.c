@@ -5,6 +5,7 @@
 #include "common.h"
 #include "lib/panic.h"
 #include "lib/printf.h"
+#include "proc/fault.h"
 #include "proc/task.h"
 #include "sys/syscall.h"
 
@@ -61,6 +62,8 @@ void handle_sync_el1(uint64_t esr, uint64_t far, struct trapframe *tf) {
     halt();
 }
 
+static void user_fault(uint64_t esr, uint64_t far, struct trapframe *tf);
+
 // Synchronous exception from EL0: a syscall, the first FP/SIMD use since the
 // task was switched in, or a user fault.
 void handle_sync_el0(uint64_t esr, uint64_t far, struct trapframe *tf) {
@@ -74,9 +77,39 @@ void handle_sync_el0(uint64_t esr, uint64_t far, struct trapframe *tf) {
         fpsimd_trap();  // the faulting instruction is retried on return
         return;
     }
-    panic_begin();
-    printf("\n*** User fault (EL0) ***\n");
-    printf("  ESR=0x%lx EC=0x%lx FAR=0x%lx ELR=0x%lx\n", esr, ESR_EC(esr), far,
-           tf->elr);
-    halt();
+    user_fault(esr, far, tf);
+}
+
+// A fault in a program: its fault handler runs in place of the instruction
+// (fault_handler, syscall 70), or the program ends with EXIT_FAULT. The
+// rest of the system goes on: with no memory protection, what the program
+// wrote before the fault is the only harm it can have done.
+static void user_fault(uint64_t esr, uint64_t far, struct trapframe *tf) {
+    task_t *t = task_current();
+    unsigned kind = fault_kind(esr);
+    uint64_t addr = fault_has_addr(esr) ? far : 0;
+    if (t->fault_handler != 0) {
+        // fn(kind, addr, pc, esr) on the thread's stack, aligned in case the
+        // fault was a misaligned SP. It must not return: x30 is 0. One fault
+        // only: a fault in the handler ends the program.
+        tf->regs[0] = kind;
+        tf->regs[1] = addr;
+        tf->regs[2] = tf->elr;
+        tf->regs[3] = esr;
+        tf->regs[30] = 0;
+        tf->sp &= ~(uint64_t)15;
+        tf->elr = t->fault_handler;
+        t->fault_handler = 0;
+        return;
+    }
+    // "[fault]", not a panic's "***": the machine goes on.
+    printf("[fault] %s (pid %d, thread %d): %s", t->proc != NULL ? t->proc->name : t->name,
+           t->proc != NULL ? t->proc->pid : 0, t->pid, fault_name(kind));
+    if (fault_has_addr(esr)) {
+        const char *how = ESR_EC(esr) != ESR_EC_DABT_LOWER ? "at"
+                          : kind & FAULT_WRITE ? "writing" : "reading";
+        printf(" %s 0x%lx", how, addr);
+    }
+    printf(", pc 0x%lx, ESR 0x%lx: program ended\n", tf->elr, esr);
+    task_exit(EXIT_FAULT);
 }

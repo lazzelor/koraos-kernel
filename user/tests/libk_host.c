@@ -236,3 +236,11 @@ int gettid(void) {
 long conlog(const char *text, size_t length) {
     return CALL(SYS_CONLOG, text, length, 0, 0);
 }
+
+int fault_handler(fault_fn fn) {
+    return (int)CALL(SYS_FAULT_HANDLER, fn, 0, 0, 0);
+}
+
+int machine_info(struct machine_info *out) {
+    return (int)CALL(SYS_MACHINE_INFO, out, 0, 0, 0);
+}

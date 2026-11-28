@@ -1069,6 +1069,28 @@ def run(q, graphics=True, keyboard=None, repeat=0, multi_volume=False, write_tes
         q.expect(PROMPT)
     yield "signals: bits, threads, a port and a child's end in one wait, kill", signals
 
+    def faults():
+        # faultprobe: faults caught by a handler (a read of an unmapped
+        # address, a write to code, UDF, BRK, a jump to nothing), machine code
+        # written to RAM and run, the memory map, and children whose
+        # uncaught faults end them, not the machine: the kernel reports each.
+        q.send("faultprobe\r")
+        for case in (rb"machine [^\r\n]+, \d+ regions",
+                     rb"data, code, undefined, break and jump faults caught",
+                     rb"machine code written to memory runs",
+                     rb"an uncaught fault ends its program, not the machine",
+                     rb"all passed"):
+            m = q.expect(rb"^faultprobe: (?:(" + case + rb")|FAIL ([^\r\n]*))\r?\n", timeout=60)
+            if m.group(2) is not None:
+                raise Failure("faultprobe: %s" % m.group(2).decode(errors="replace"))
+        q.expect(rb"\] exited with 0")
+        q.expect(PROMPT)
+        log = open(q.log.name, "rb").read()
+        if not re.search(rb"\[fault\] faultprobe \(pid \d+, thread \d+\): data abort reading "
+                         rb"0x200000008, pc 0x[0-9a-f]+, ESR 0x[0-9a-f]+: program ended", log):
+            raise Failure("the kernel did not report the uncaught fault")
+    yield "faults: caught by a handler, or ending only their program; machine code; the map", faults
+
     def screen_manager_claims():
         # inputprobe: what a screen manager takes from the kernel. A signal at
         # any process's end, the input queue and the screen, each claimed,

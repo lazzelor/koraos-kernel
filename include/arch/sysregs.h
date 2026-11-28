@@ -16,6 +16,8 @@
 #define SCTLR_RESERVED          (BIT(29) | BIT(28) | BIT(23) | BIT(22) | BIT(20) | BIT(11))
 #define SCTLR_EE_LITTLE_ENDIAN  (0 << 25)
 #define SCTLR_EOE_LITTLE_ENDIAN (0 << 24)
+#define SCTLR_UCI               BIT(26)  // EL0 may clean and invalidate caches by address
+#define SCTLR_UCT               BIT(15)  // EL0 may read CTR_EL0 (the cache line sizes)
 #define SCTLR_I_CACHE           BIT(12)  // instruction cache enable
 #define SCTLR_D_CACHE           BIT(2)   // data cache enable
 #define SCTLR_MMU_ENABLED       BIT(0)   // stage-1 MMU enable

@@ -68,6 +68,8 @@ SYSCALL input_focus, SYS_INPUT_FOCUS
 SYSCALL fb_claim, SYS_FB_CLAIM
 SYSCALL gettid, SYS_GETTID
 SYSCALL conlog, SYS_CONLOG
+SYSCALL fault_handler, SYS_FAULT_HANDLER
+SYSCALL machine_info, SYS_MACHINE_INFO
 
 // exit(), rename() and the program entry point come from the libc (user/libc).
 

@@ -77,6 +77,8 @@ kernel dispatches them in [`src/sys/syscall.c`](../src/sys/syscall.c).
 | 67 | `fb_claim` | `int fb_claim(int on)` | `0`, or `-1` if another program holds the screen |
 | 68 | `gettid` | `int gettid(void)` | the calling thread's id, the pid in a program's main thread |
 | 69 | `conlog` | `long conlog(const char *text, size_t length)` | bytes copied to the serial line, `0` with the debug console's conlog off |
+| 70 | `fault_handler` | `int fault_handler(fault_fn fn)` | `0` |
+| 71 | `machine_info` | `int machine_info(struct machine_info *out)` | `0`, or `-1` bad pointer |
 
 ## Notes per call
 
@@ -398,6 +400,96 @@ are in [`<_libc/console.h>`](../user/libc/includes/_libc/console.h), which
   (`length` 1 or 0), which makes ESC a break signal for the program that
   sent it instead of a key (`console_esc_break()`). The protocol is in
   `<_libc/console.h>`.
+
+### Machine access (70 and 71)
+
+For KoraCLI's phase 4 (`PEEK`, `POKE`, machine code;
+`project_doc/koracli-plan.md`), where a program reads and writes memory
+by address, and may get one wrong.
+
+- **A fault ends only its program.** A program that faults (reads or
+  writes an address with nothing mapped there, writes to code, runs an
+  undefined instruction or a `BRK`, jumps to a misaligned address...)
+  ends with exit code `EXIT_FAULT` (`-11`), all its threads with it, and
+  the kernel reports it on the serial line:
+
+  ```
+  [fault] faultprobe (pid 115, thread 115): data abort reading 0x200000008, pc 0x41773c24, ESR 0x92000005: program ended
+  ```
+
+  Before step 4a a fault stopped the whole machine. With no memory
+  protection, a program can still overwrite the kernel or another program
+  before it faults: what is caught is the fault itself. An SError (an
+  asynchronous external abort, as a peripheral address with nothing behind
+  it may cause on a Pi) still stops the machine.
+- **`fault_handler`** arms the calling thread to catch its next fault:
+  instead of the program ending, `fn(kind, addr, pc, esr)` runs on the
+  thread's stack (aligned to 16 bytes) in place of the faulting
+  instruction. `kind` is a `FAULT_` value, `FAULT_WRITE` added for a
+  store; `addr` the address that faulted for data and instruction aborts
+  and a misaligned PC (0 otherwise); `pc` the instruction's address;
+  `esr` the raw syndrome. The kinds come from the syndrome
+  (`src/proc/fault.c`):
+
+  | Kind | Syndrome (EC) |
+  |---|---|
+  | `FAULT_DATA` (1) | data abort (0x24), alignment faults aside |
+  | `FAULT_EXEC` (2) | instruction abort (0x20) |
+  | `FAULT_ALIGN` (3) | misaligned PC (0x22) or SP (0x26), or a data alignment fault |
+  | `FAULT_UNDEF` (4) | unknown (0x00) or a trapped system instruction (0x18) |
+  | `FAULT_BREAK` (5) | `BRK` (0x3c) |
+  | `FAULT_OTHER` (6) | anything else |
+
+  The faulting registers are gone (x0 to x3 hold the arguments, x30 is 0),
+  so `fn` must not return: it ends the program or `longjmp`s back, as
+  `faultprobe` does. Arming is for one fault: delivering it disarms the
+  handler, so a fault inside `fn` ends the program, and `fn` arms again
+  for the next. `fault_handler(NULL)` disarms. Each thread has its own; a
+  new thread starts unarmed. The kernel checks nothing about `fn`: a bad
+  one faults in turn, unarmed.
+- **Machine code** a program writes into RAM (all of it is EL0-executable)
+  runs after libk's `code_sync(addr, length)`, which cleans the data cache
+  and invalidates the instruction cache over it. A program may do that
+  itself because the kernel sets `SCTLR_EL1.UCI` and `UCT` (cache
+  maintenance by address and `CTR_EL0` at EL0).
+- **`machine_info`** describes the machine: the board's name (a Pi's from
+  its revision code, as `Raspberry Pi 3 Model B+`; `QEMU virt`), the
+  revision code, all its RAM in bytes, the base of the Pi's peripherals
+  (`PBASE`; 0 on virt), and up to `MACHINE_REGIONS_MAX` (6) mapped ranges,
+  lowest first, from `src/sys/machine.c`:
+
+  | Target | Regions |
+  |---|---|
+  | Pi 3 | code from 0 to the end of the kernel's text, RAM to `0x3F000000`, devices to `0x40040000` (the peripherals and the ARM's local ones) |
+  | Pi 4 | code, RAM to the end of the RAM or `0xFC000000` (the MMU maps the low 4 GB only), devices from `0xFC000000` to 4 GB |
+  | virt | devices below the RAM, then the RAM with the kernel's code in it, up to 4 GB |
+
+  A program reads and writes `MEM_RAM`, reads `MEM_CODE` (writes fault;
+  page 0 is in it), and reads and writes `MEM_DEVICE`, where an address
+  with no device may fault or, on a Pi, stop the machine. Anything else
+  faults.
+
+```c
+#define EXIT_FAULT (-11)
+typedef void (*fault_fn)(unsigned kind, uintptr_t addr, uintptr_t pc, uint64_t esr);
+
+#define MACHINE_REGIONS_MAX 6
+enum { MEM_RAM = 1, MEM_CODE = 2, MEM_DEVICE = 3 };
+struct machine_region {
+    unsigned long base;
+    unsigned long size;
+    unsigned int kind;  /* MEM_ */
+    unsigned int reserved;
+};
+struct machine_info {      /* 200 bytes */
+    char board[32];
+    unsigned int revision;
+    unsigned int region_count;
+    unsigned long ram_bytes;
+    unsigned long periph_base;
+    struct machine_region regions[MACHINE_REGIONS_MAX];
+};
+```
 
 ## Structs and constants
 

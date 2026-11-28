@@ -78,6 +78,8 @@ run_test placement src/proc/placement.c
 run_test sd src/drivers/sd.c
 run_test readahead src/drivers/readahead.c
 run_test ramdisk_image src/fs/ramdisk_image.c
+run_test fault src/proc/fault.c
+run_test machine src/sys/machine.c
 run_test input src/input/input.c
 run_test keylog src/input/keylog.c src/lib/printf.c
 run_test typing src/input/typing.c src/lib/string.c

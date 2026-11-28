@@ -93,6 +93,13 @@ Use this file when you drop into the workspace so you can ramp quickly and keep 
   `proc/task.h`, `<_libc/console.h>`): the kernel console, a file or a console
   handler's port, set at spawn (`spawn_std`). The libc reads them on first
   I/O (`user/libc/src/stdio/handle.c`); raw fds 0/1/2 stay the kernel console.
+- A fault in a program (EL0) ends only that program, with `EXIT_FAULT`
+  and a `[fault]` line on the serial line (`src/arch/exception.c`); a
+  thread can catch its next one with `fault_handler` (syscall 70), which
+  KoraCLI's PEEK, POKE and machine code build on. `machine_info` (71) is
+  the board and the memory map (`src/sys/machine.c`); libk's `code_sync`
+  makes machine code a program wrote runnable (EL0 cache maintenance,
+  `SCTLR_EL1.UCI`/`UCT`). `faultprobe` tests them.
 - Keyboards post key events, and mice (USB through Circle, VirtIO mouse and
   tablet, the debug console's `mouse`) mouse events, to the input event queue
   (`src/input`, `include/input/input.h`); only input that is bytes already

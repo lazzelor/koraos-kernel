@@ -5,6 +5,11 @@
 #include "common.h"
 #include "mm.h"
 #include "peripherals/base.h"
+#include "sys/machine.h"
+#ifndef KORAOS_VIRT
+#include "drivers/mailbox.h"
+#include "fs/ramdisk_image.h"
+#endif
 #ifdef KORAOS_VIRT
 #include "platform/virt.h"
 extern char kernel_start[];
@@ -171,7 +176,9 @@ void mmu_enable_this_core(void) {
 
     uint64_t sctlr;
     asm volatile("mrs %0, sctlr_el1" : "=r"(sctlr));
-    sctlr |= SCTLR_MMU_ENABLED | SCTLR_D_CACHE | SCTLR_I_CACHE;
+    // A program may sync the caches for machine code it wrote (libk's
+    // code_sync): DC CVAU and IC IVAU at EL0, and CTR_EL0 for line sizes.
+    sctlr |= SCTLR_MMU_ENABLED | SCTLR_D_CACHE | SCTLR_I_CACHE | SCTLR_UCI | SCTLR_UCT;
     asm volatile("msr sctlr_el1, %0" ::"r"(sctlr));
     asm volatile("isb");
 
@@ -230,4 +237,23 @@ void mmu_map_coherent(uintptr_t base, size_t size) {
     dcache_clean_invalidate((const void *)start, end - start);
 
     asm volatile("msr daif, %0" ::"r"(daif) : "memory");
+}
+
+void mmu_machine_info(struct kmachine_info *out) {
+    static struct kmachine_info machine;
+    static bool known;
+    if (!known) {  // under the BKL, as every syscall is
+#ifdef KORAOS_VIRT
+        const struct virt_platform *platform = virt_platform_get();
+        uint64_t code_start = (uintptr_t)kernel_start & ~(uint64_t)(SECTION_SIZE - 1);
+        machine_virt_layout(&machine, platform->ram_base, platform->ram_size, code_start,
+                            (uint64_t)text_end);
+#else
+        uint32_t revision = mailbox_board_revision();
+        machine_pi_layout(&machine, RPI_VERSION, revision, ramdisk_pi_ram_bytes(revision),
+                          (uint64_t)text_end, PBASE, DEVICE_BASE);
+#endif
+        known = true;
+    }
+    *out = machine;
 }

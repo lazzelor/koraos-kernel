@@ -37,6 +37,8 @@ Current suites:
 | `user_mem_test.c` | `src/proc/user_mem.c`: per-task page-run records behind `alloc_pages`/`free_pages`, foreign and double frees, reclaim on teardown, no leaks on failure |
 | `filesystem_test.c` | `src/fs/fat32.c` and `src/fs/namespace.c` on mtools-made volumes: independent geometry/caches, root/BPB labels, duplicate labels/device collisions, relative paths, cwd isolation, retained handles, malformed geometry/chains/LFN, allocation and I/O errors, assign snapshots/replacement/removal/capacity, c-only command lookup and shadowed-label cwd, owned cwd/assign ancestor pins, busy reset and flush-failed reset preservation/retry |
 | `blkdev_test.c` | `src/fs/blkdev.c`: bare FAT32 and mixed MBR discovery, hidden FAT32 types, invalid/range/overlap tables, partition-relative bounded read/write/flush, read-only and unsupported I/O, registry capacity |
+| `fault_test.c` | `src/proc/fault.c`: the kind of a program's fault from its syndrome (a read, a write, FnV with no address, alignment of a load, a store, the PC and the SP, an instruction abort, UDF, a trapped system register, BRK, anything else) and the names a report gives them |
+| `machine_test.c` | `src/sys/machine.c`, what `machine_info` reports: Pi boards from their revision codes (and the generic name for the rest), the Pi 3's map, the Pi 4's with 8 GB, 1 GB and RAM unknown, virt's with and without RAM below the kernel's code, up to 4 GB |
 | `placement_test.c` | `src/proc/placement.c`: least-loaded core with ties to the lowest, offline cores skipped, even spreading, pinned requests honoured or refused (offline or nonexistent core) |
 | `spinlock_test.c` | `src/arch/spinlock.c`: one thread per simulated core; lock/trylock/irqsave bookkeeping, panics on recursive locking and foreign unlock (in forked children), and a contended counter with no lost updates or overlapping critical sections. Runs twice: on arm64 hosts the real `LDAXR`/`STXR` code, and the compiler-atomic fallback (`SPINLOCK_PORTABLE`) |
 | `kmalloc_test.c` | `src/mm/kmalloc.c`, `src/mm/kmalloc_stress.c`: alignment, zeroing, cache-line separation, block reuse, slab release, page runs, over-aligned blocks, exhaustion, invalid and double frees, balanced IRQ masking, seeded stress |
@@ -378,6 +380,15 @@ program killed while it sleeps in `port_wait`. `sigprobe` checks signals:
 allocation, set, clear and wait, a thread waking another (on another core
 when there is one), 50 messages and a child's end served from one
 `sig_wait`, as a console handler does, and a program killed in `sig_wait`.
+`faultprobe` checks machine access (KoraCLI step 4a): the memory map from
+`machine_info` (its regions listed, its stack and heap in RAM, nothing past
+4 GB, the Pi's peripherals a device region), a handler catching a read of
+an unmapped address, a write to code, UDF, BRK and a jump to nothing (with
+the kind, the address and the pc), machine code written to RAM and run
+after `code_sync`, rewritten and run again with arguments, and children
+ended by an uncaught fault (plain, disarmed, inside the handler, in a second
+thread) with `EXIT_FAULT`; the smoke test also checks the kernel's
+`[fault]` report on the serial line.
 `inputprobe` checks what a screen manager takes from the kernel: a signal at
 any process's end (a child, another program's orphan, a watch stopped or
 whose bit is freed), the input queue and the screen, each claimed, refused to

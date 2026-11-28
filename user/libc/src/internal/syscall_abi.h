@@ -72,6 +72,8 @@
 #define SYS_FB_CLAIM     67
 #define SYS_GETTID   68
 #define SYS_CONLOG   69
+#define SYS_FAULT_HANDLER 70
+#define SYS_MACHINE_INFO  71
 
 /* open() flags, as the FAT32 layer defines them (checked too). */
 #define KORA_O_RDONLY 0

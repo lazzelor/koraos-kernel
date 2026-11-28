@@ -331,7 +331,7 @@ categories:
         prs: [128]
       - id: koracli-machine-access
         name: Machine access
-        status: planned
+        status: in_progress
         description: PEEK, POKE, indirection operators, SYS and a GPIO layer, from BASIC and from Python.
       - id: koracli-graphics
         name: Graphics and sound

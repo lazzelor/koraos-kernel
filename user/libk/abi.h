@@ -73,3 +73,7 @@
 #define SYS_FB_CLAIM     67
 #define SYS_GETTID   68
 #define SYS_CONLOG   69
+
+/* Machine access. */
+#define SYS_FAULT_HANDLER 70
+#define SYS_MACHINE_INFO  71

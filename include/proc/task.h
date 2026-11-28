@@ -53,6 +53,7 @@ static inline size_t user_stack_pages(uint64_t bytes, size_t fallback) {
     return (size_t)((bytes + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 #define EXIT_KILLED (-9)     // exit code of a process ended by kill()
+#define EXIT_FAULT (-11)     // exit code of a process ended by a fault it did not catch
 #define KSTACK_PAGES 4       // 16 KB kernel stack per task
 #define MAX_ARGS 16          // most argv entries a spawned program may receive
 #define MAX_OPEN_FILES 16    // open file/directory handles per task
@@ -158,6 +159,7 @@ typedef struct task {
     struct cpu_context ctx;           // kernel context while switched out
     bool fp_used;                     // fp holds this task's FP/SIMD state
     struct fpsimd_state fp;           // saved when another task takes the registers
+    uint64_t fault_handler;           // fault_handler(): where its next fault goes, 0 none
 } task_t;
 
 // Load the named program and create a process for it, with a runnable main

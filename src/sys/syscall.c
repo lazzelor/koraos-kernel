@@ -15,6 +15,8 @@
 #include "mm.h"
 #include "mm/frame_alloc.h"
 #include "mm/kmalloc.h"
+#include "mm/mmu.h"
+#include "sys/machine.h"
 #include "video/console_fb.h"
 
 // lseek whence values; must match user/libk/koraos.h.
@@ -792,6 +794,18 @@ void syscall_handle(struct trapframe *tf) {
         break;
     case SYS_conlog:
         ret = sys_conlog((const char *)a0, a1);
+        break;
+    case SYS_fault_handler:
+        task_current()->fault_handler = a0;  // checked when it runs: a bad one faults
+        ret = 0;
+        break;
+    case SYS_machine_info:
+        if (uptr_ok(a0, sizeof(struct kmachine_info))) {
+            mmu_machine_info((struct kmachine_info *)a0);
+            ret = 0;
+        } else {
+            ret = -1;
+        }
         break;
     default:
         ret = -1;
